@@ -24,6 +24,12 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+const document = client.db('BuildCareDB')
+const ApartmentsCollection = document.collection('apartments')
+app.get('/apartments',async(req,res) =>  {
+  const result = await ApartmentsCollection.find().toArray()
+  res.send(result)
+})
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
@@ -37,7 +43,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", async (req, res) => {
-  req.send("hello from home");
+  res.send("hello from home");
 });
 
 app.listen(port, () => {
