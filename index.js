@@ -1,16 +1,15 @@
 const express = require("express");
 const cors = require("cors");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion } = require("mongodb");
-require('dotenv').config()
+require("dotenv").config();
 const port = process.env.PORT || 5000;
 const app = express();
 
 app.use(express.json());
 app.use(cors());
 
-const uri =
-  `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8yejb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.8yejb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -25,70 +24,102 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-const document = client.db('BuildCareDB')
-// collections
-const ApartmentsCollection = document.collection('apartments')
-const userCollection = document.collection('users')
-const agreementCollection = document.collection('agreements')
+    const document = client.db("BuildCareDB");
+    // collections
+    const ApartmentsCollection = document.collection("apartments");
+    const userCollection = document.collection("users");
+    const agreementCollection = document.collection("agreements");
 
- // jwt related api
- app.post('/jwt', async (req, res) => {
-  const user = req.body;
-  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10d' });
-  res.send({ token });
-})
+    // jwt related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "10d",
+      });
+      res.send({ token });
+    });
 
-// middleware
-const verifyToken = (req, res, next) => {
-  // console.log('inside verify token', req.headers.authorization);
-  if (!req.headers.authorization) {
-    return res.status(401).send({ message: 'unauthorized access' });
-  }
-  const token = req.headers.authorization.split(' ')[1];
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(401).send({ message: 'unauthorized access' })
-    }
-    req.decoded = decoded;
-    next();
-  })
-}
+    // middleware
+    const verifyToken = (req, res, next) => {
+      // console.log('inside verify token', req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
 
-const verifyAdmin = async (req, res, next) => {
-  const email = req.decoded.email;
-  const query = { email: email };
-  const user = await userCollection.findOne(query);
-  const isAdmin = user?.role === 'admin';
-  if (!isAdmin) {
-    return res.status(403).send({ message: 'forbidden access' });
-  }
-  next();
-}
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
 
-// users related apis
-app.post('/users', async (req, res) => {
-  const user = req.body;
-  const query = { email: user.email }
-  const existingUser = await userCollection.findOne(query);
-  if (existingUser) {
-    return res.send({ message: 'user already exists', insertedId: null })
-  }
-  const result = await userCollection.insertOne(user);
-  res.send(result);
-});
+    // users related apis
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exists", insertedId: null });
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
 
-//  apartments related apis
-app.get('/apartments',async(req,res) =>  {
-  const result = await ApartmentsCollection.find().toArray()
-  res.send(result)
-})
+    //  apartments related apis
+    app.get("/apartments", async (req, res) => {
+      const result = await ApartmentsCollection.find().toArray();
+      res.send(result);
+    });
 
-// agreements related apis
-app.post('/agreements',async(req,res) => {
-  const agreement = req.body;
-  const result = await agreementCollection.insertOne(result)
-  res.send(result)
-})
+    app.get("/search", async (req, res) => {
+      const search = parseInt(req.query.search); // Convert the search term to a number
+      let cursor = {
+          rent: {
+              $lte: search, // Find apartments with rent greater than or equal to the search term
+          },
+      };
+      const result = await ApartmentsCollection.find(cursor).toArray();
+      res.send(result);
+  });
+  
+
+    // agreements related apis
+    app.get("/agreements", verifyToken, async (req, res) => {
+      const result = await agreementCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.get("/agreements/:email", verifyToken, async (req, res) => {
+      const user = req.params.email;
+      const query = { email: user };
+      const result = await agreementCollection.findOne(query)
+      res.send(result);
+    });
+
+    app.post("/agreements/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const isExist = await agreementCollection.findOne(query);
+      if (isExist) {
+        return res.send({ message: "one user one agreements", insertedId: null });
+      }
+      const agreement = req.body;
+      const result = await agreementCollection.insertOne(agreement);
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
