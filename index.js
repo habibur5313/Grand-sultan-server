@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 const app = express();
@@ -68,12 +68,12 @@ async function run() {
     };
 
     // users related apis
-app.get("/users/:email", async(req,res) => {
-  const email = req.params.email;
-  const query = {email: email}
-  const result = await userCollection.findOne(query)
-  res.send(result)
-})
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      res.send(result);
+    });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -93,16 +93,15 @@ app.get("/users/:email", async(req,res) => {
     });
 
     app.get("/search", async (req, res) => {
-      const search = parseInt(req.query.search); 
+      const search = parseInt(req.query.search);
       let cursor = {
-          rent: {
-              $lte: search,
-          },
+        rent: {
+          $lte: search,
+        },
       };
       const result = await ApartmentsCollection.find(cursor).toArray();
       res.send(result);
-  });
-  
+    });
 
     // agreements related apis
     app.get("/agreements", verifyToken, async (req, res) => {
@@ -113,7 +112,7 @@ app.get("/users/:email", async(req,res) => {
     app.get("/agreements/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
-      const result = await agreementCollection.findOne(query)
+      const result = await agreementCollection.findOne(query);
       res.send(result);
     });
 
@@ -122,23 +121,57 @@ app.get("/users/:email", async(req,res) => {
       const query = { email: email };
       const isExist = await agreementCollection.findOne(query);
       if (isExist) {
-        return res.send({ message: "One user one agreement", insertedId: null });
+        return res.send({
+          message: "One user one agreement",
+          insertedId: null,
+        });
       }
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
     });
 
+    app.patch("/agreementsRequest/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: "checked",
+        },
+      };
+      const agreementUpdate = await agreementCollection.updateOne(
+        filter,
+        updatedDoc
+      );
+      const button = req.query.button;
+      const email = req.query.email;
+      const query = { email: email };
+      if (button === "accept") {
+        const update = {
+          $set: {
+            role: "member",
+          },
+        };
+        const result = await userCollection.updateOne(query,update)
+        res.send(result)
+      }
+    });
+
     // announcements related apis
-    app.get("/makeAnnouncements",verifyToken,async(req,res) => {
-      const result = await announcementCollection.find().toArray()
-      res.send(result)
-    })
-    app.post("/makeAnnouncements",verifyToken,verifyAdmin,async(req,res) => {
-      const announcement = req.body;
-      const result = await announcementCollection.insertOne(announcement)
-      res.send(result)
-    })
+    app.get("/makeAnnouncements", verifyToken, async (req, res) => {
+      const result = await announcementCollection.find().toArray();
+      res.send(result);
+    });
+    app.post(
+      "/makeAnnouncements",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const announcement = req.body;
+        const result = await announcementCollection.insertOne(announcement);
+        res.send(result);
+      }
+    );
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
