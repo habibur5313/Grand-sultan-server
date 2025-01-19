@@ -29,6 +29,7 @@ async function run() {
     const ApartmentsCollection = document.collection("apartments");
     const userCollection = document.collection("users");
     const agreementCollection = document.collection("agreements");
+    const announcementCollection = document.collection("announcements");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -67,6 +68,13 @@ async function run() {
     };
 
     // users related apis
+app.get("/users/:email", async(req,res) => {
+  const email = req.params.email;
+  const query = {email: email}
+  const result = await userCollection.findOne(query)
+  res.send(result)
+})
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -85,10 +93,10 @@ async function run() {
     });
 
     app.get("/search", async (req, res) => {
-      const search = parseInt(req.query.search); // Convert the search term to a number
+      const search = parseInt(req.query.search); 
       let cursor = {
           rent: {
-              $lte: search, // Find apartments with rent greater than or equal to the search term
+              $lte: search,
           },
       };
       const result = await ApartmentsCollection.find(cursor).toArray();
@@ -103,8 +111,8 @@ async function run() {
     });
 
     app.get("/agreements/:email", verifyToken, async (req, res) => {
-      const user = req.params.email;
-      const query = { email: user };
+      const email = req.params.email;
+      const query = { email: email };
       const result = await agreementCollection.findOne(query)
       res.send(result);
     });
@@ -114,12 +122,23 @@ async function run() {
       const query = { email: email };
       const isExist = await agreementCollection.findOne(query);
       if (isExist) {
-        return res.send({ message: "one user one agreements", insertedId: null });
+        return res.send({ message: "One user one agreement", insertedId: null });
       }
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
       res.send(result);
     });
+
+    // announcements related apis
+    app.get("/makeAnnouncements",verifyToken,async(req,res) => {
+      const result = await announcementCollection.find().toArray()
+      res.send(result)
+    })
+    app.post("/makeAnnouncements",verifyToken,verifyAdmin,async(req,res) => {
+      const announcement = req.body;
+      const result = await announcementCollection.insertOne(announcement)
+      res.send(result)
+    })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
