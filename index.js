@@ -29,6 +29,7 @@ async function run() {
     const ApartmentsCollection = document.collection("apartments");
     const userCollection = document.collection("users");
     const agreementCollection = document.collection("agreements");
+    const memberAgreementCollection = document.collection("memberAgreement");
     const announcementCollection = document.collection("announcements");
 
     // jwt related api
@@ -104,12 +105,12 @@ async function run() {
     });
 
     // agreements related apis
-    app.get("/agreements", verifyToken, async (req, res) => {
+    app.get("/agreements", verifyToken,verifyAdmin, async (req, res) => {
       const result = await agreementCollection.find().toArray();
       res.send(result);
     });
 
-    app.get("/agreements/:email", verifyToken, async (req, res) => {
+    app.get("/agreements/:email", verifyToken,verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await agreementCollection.findOne(query);
@@ -128,10 +129,11 @@ async function run() {
       }
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
+      const insertAgreement = await memberAgreementCollection.insertOne(agreement)
       res.send(result);
     });
 
-    app.patch("/agreementsRequest/:id", async (req, res) => {
+    app.patch("/agreementsRequest/:id",verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -139,7 +141,7 @@ async function run() {
           status: "checked",
         },
       };
-      const agreementUpdate = await agreementCollection.updateOne(
+      const agreementUpdate = await memberAgreementCollection.updateOne(
         filter,
         updatedDoc
       );
@@ -153,6 +155,11 @@ async function run() {
           },
         };
         const result = await userCollection.updateOne(query,update)
+        const requestDelete = await agreementCollection.deleteOne(query)
+        res.send(result)
+      }
+      else{
+        const result = await agreementCollection.deleteOne(query)
         res.send(result)
       }
     });
@@ -172,6 +179,28 @@ async function run() {
         res.send(result);
       }
     );
+
+    // members apis
+    app.get('/members',verifyToken,verifyAdmin,async(req,res) => {
+      const query = {role: 'member'}
+      const result = await userCollection.find(query).toArray()
+      res.send(result);
+      
+    })
+
+    app.patch('/members/:id',async(req,res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const update = {
+        $set: {
+          role: ''
+        }
+      }
+      const result = await userCollection.updateOne(query,update)
+      res.send(result)
+      
+      
+    })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
