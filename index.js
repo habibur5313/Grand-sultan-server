@@ -69,7 +69,7 @@ async function run() {
     };
 
     // users related apis
-    app.get("/users/:email", async (req, res) => {
+    app.get("/users/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const result = await userCollection.findOne(query);
@@ -89,8 +89,18 @@ async function run() {
 
     //  apartments related apis
     app.get("/apartments", async (req, res) => {
-      const result = await ApartmentsCollection.find().toArray();
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 6;
+      const skip = (page - 1) * limit;      
+      const result = await ApartmentsCollection.find().skip(skip)
+      .limit(limit).toArray();
       res.send(result);
+    });
+
+    app.get("/apartmentsCount", async (req, res) => {
+      const total = await ApartmentsCollection.estimatedDocumentCount();
+      res.send({ total });
+      // console.log(total);
     });
 
     app.get("/search", async (req, res) => {
@@ -105,17 +115,22 @@ async function run() {
     });
 
     // agreements related apis
-    app.get("/agreements", verifyToken,verifyAdmin, async (req, res) => {
+    app.get("/agreements", verifyToken, verifyAdmin, async (req, res) => {
       const result = await agreementCollection.find().toArray();
       res.send(result);
     });
 
-    app.get("/agreements/:email", verifyToken,verifyAdmin, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const result = await agreementCollection.findOne(query);
-      res.send(result);
-    });
+    app.get(
+      "/agreements/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await agreementCollection.findOne(query);
+        res.send(result);
+      }
+    );
 
     app.post("/agreements/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
@@ -129,40 +144,46 @@ async function run() {
       }
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
-      const insertAgreement = await memberAgreementCollection.insertOne(agreement)
+      const insertAgreement = await memberAgreementCollection.insertOne(
+        agreement
+      );
       res.send(result);
     });
 
-    app.patch("/agreementsRequest/:id",verifyToken,verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          status: "checked",
-        },
-      };
-      const agreementUpdate = await memberAgreementCollection.updateOne(
-        filter,
-        updatedDoc
-      );
-      const button = req.query.button;
-      const email = req.query.email;
-      const query = { email: email };
-      if (button === "accept") {
-        const update = {
+    app.patch(
+      "/agreementsRequest/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
           $set: {
-            role: "member",
+            status: "checked",
           },
         };
-        const result = await userCollection.updateOne(query,update)
-        const requestDelete = await agreementCollection.deleteOne(query)
-        res.send(result)
+        const agreementUpdate = await memberAgreementCollection.updateOne(
+          filter,
+          updatedDoc
+        );
+        const button = req.query.button;
+        const email = req.query.email;
+        const query = { email: email };
+        if (button === "accept") {
+          const update = {
+            $set: {
+              role: "member",
+            },
+          };
+          const result = await userCollection.updateOne(query, update);
+          const requestDelete = await agreementCollection.deleteOne(query);
+          res.send(result);
+        } else {
+          const result = await agreementCollection.deleteOne(query);
+          res.send(result);
+        }
       }
-      else{
-        const result = await agreementCollection.deleteOne(query)
-        res.send(result)
-      }
-    });
+    );
 
     // announcements related apis
     app.get("/makeAnnouncements", verifyToken, async (req, res) => {
@@ -181,26 +202,23 @@ async function run() {
     );
 
     // members apis
-    app.get('/members',verifyToken,verifyAdmin,async(req,res) => {
-      const query = {role: 'member'}
-      const result = await userCollection.find(query).toArray()
+    app.get("/members", verifyToken, verifyAdmin, async (req, res) => {
+      const query = { role: "member" };
+      const result = await userCollection.find(query).toArray();
       res.send(result);
-      
-    })
+    });
 
-    app.patch('/members/:id',async(req,res) => {
+    app.patch("/members/:id",verifyToken,verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) };
       const update = {
         $set: {
-          role: ''
-        }
-      }
-      const result = await userCollection.updateOne(query,update)
-      res.send(result)
-      
-      
-    })
+          role: "",
+        },
+      };
+      const result = await userCollection.updateOne(query, update);
+      res.send(result);
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
