@@ -69,9 +69,9 @@ async function run() {
     };
 
     // users related apis
-    app.get("/users/:email", verifyToken, async (req, res) => {
+    app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
-      const query = { email: email };
+      const query = { email: email };   
       const result = await userCollection.findOne(query);
       res.send(result);
     });
@@ -144,9 +144,6 @@ async function run() {
       }
       const agreement = req.body;
       const result = await agreementCollection.insertOne(agreement);
-      const insertAgreement = await memberAgreementCollection.insertOne(
-        agreement
-      );
       res.send(result);
     });
 
@@ -155,6 +152,7 @@ async function run() {
       verifyToken,
       verifyAdmin,
       async (req, res) => {
+        const email = req.query.email;
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
         const updatedDoc = {
@@ -162,13 +160,21 @@ async function run() {
             status: "checked",
           },
         };
+        const queryEmail = {email: email}
+        const isExist = await memberAgreementCollection.findOne(queryEmail);
+        if (isExist) {
+          return res.send({
+            message: "One user one agreement",
+            insertedId: null,
+          });
+        }
         const agreementUpdate = await memberAgreementCollection.updateOne(
           filter,
           updatedDoc
         );
         const button = req.query.button;
-        const email = req.query.email;
         const query = { email: email };
+        const requestInfo = req.body;
         if (button === "accept") {
           const update = {
             $set: {
@@ -176,6 +182,7 @@ async function run() {
             },
           };
           const result = await userCollection.updateOne(query, update);
+          const requestAdd = await memberAgreementCollection.insertOne(requestInfo)
           const requestDelete = await agreementCollection.deleteOne(query);
           res.send(result);
         } else {
@@ -219,6 +226,14 @@ async function run() {
       const result = await userCollection.updateOne(query, update);
       res.send(result);
     });
+
+    // make payment apis
+    app.get("/acceptRequests/:email",async(req,res) => {
+      const email = req.params.email;
+      const query = {email: email}
+      const result = await memberAgreementCollection.findOne(query)
+      res.send(result)
+    })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
