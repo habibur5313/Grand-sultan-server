@@ -3,6 +3,7 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 const app = express();
 
@@ -71,7 +72,7 @@ async function run() {
     // users related apis
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
-      const query = { email: email };   
+      const query = { email: email };
       const result = await userCollection.findOne(query);
       res.send(result);
     });
@@ -91,9 +92,11 @@ async function run() {
     app.get("/apartments", async (req, res) => {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 6;
-      const skip = (page - 1) * limit;      
-      const result = await ApartmentsCollection.find().skip(skip)
-      .limit(limit).toArray();
+      const skip = (page - 1) * limit;
+      const result = await ApartmentsCollection.find()
+        .skip(skip)
+        .limit(limit)
+        .toArray();
       res.send(result);
     });
 
@@ -160,7 +163,7 @@ async function run() {
             status: "checked",
           },
         };
-        const queryEmail = {email: email}
+        const queryEmail = { email: email };
         const isExist = await memberAgreementCollection.findOne(queryEmail);
         if (isExist) {
           return res.send({
@@ -182,7 +185,9 @@ async function run() {
             },
           };
           const result = await userCollection.updateOne(query, update);
-          const requestAdd = await memberAgreementCollection.insertOne(requestInfo)
+          const requestAdd = await memberAgreementCollection.insertOne(
+            requestInfo
+          );
           const requestDelete = await agreementCollection.deleteOne(query);
           res.send(result);
         } else {
@@ -215,7 +220,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/members/:id",verifyToken,verifyAdmin, async (req, res) => {
+    app.patch("/members/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const update = {
@@ -228,12 +233,24 @@ async function run() {
     });
 
     // make payment apis
-    app.get("/acceptRequests/:email",async(req,res) => {
+    app.get("/acceptRequests/:email", async (req, res) => {
       const email = req.params.email;
-      const query = {email: email}
-      const result = await memberAgreementCollection.findOne(query)
-      res.send(result)
-    })
+      const query = { email: email };
+      const result = await memberAgreementCollection.findOne(query);
+      res.send(result);
+    });
+
+    // payment intent
+    app.post("/create-checkout-session", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({ clientSecret: paymentIntent.client_secret });
+    });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
