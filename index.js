@@ -32,6 +32,7 @@ async function run() {
     const agreementCollection = document.collection("agreements");
     const memberAgreementCollection = document.collection("memberAgreement");
     const announcementCollection = document.collection("announcements");
+    const paymentCollection = document.collection("payments");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -240,6 +241,20 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/acceptRequest/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const month = req.query.month;
+
+      const update = {
+        $set: {
+          month: month,
+        },
+      };
+      const result = await memberAgreementCollection.updateOne(query, update);
+      res.send(result);
+    });
+
     // payment intent
     app.post("/create-checkout-session", async (req, res) => {
       const { price } = req.body;
@@ -250,6 +265,16 @@ async function run() {
         payment_method_types: ["card"],
       });
       res.send({ clientSecret: paymentIntent.client_secret });
+    });
+
+    // payments
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const acceptRequestId = req.query.acceptRequestId;
+      const query = {_id: new ObjectId(acceptRequestId)}
+      const paymentResult = await paymentCollection.insertOne(payment);
+      const deleteResult = await memberAgreementCollection.deleteOne(query)
+      res.send({ paymentResult,deleteResult });
     });
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
