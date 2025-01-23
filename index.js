@@ -33,6 +33,7 @@ async function run() {
     const memberAgreementCollection = document.collection("memberAgreement");
     const announcementCollection = document.collection("announcements");
     const paymentCollection = document.collection("payments");
+    const couponCollection = document.collection("coupons");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -244,62 +245,101 @@ async function run() {
       res.send(result);
     });
 
-    // make payment apis
-    app.get("/acceptRequests/:email",verifyToken,verifyMember, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const result = await memberAgreementCollection.findOne(query);
+    // coupon code related apis
+    app.get("/couponCodes",verifyToken, async (req, res) => {
+      const result = await couponCollection.find().toArray();
       res.send(result);
     });
 
-    app.patch("/acceptRequest/:email",verifyToken,verifyMember, async (req, res) => {
-      const email = req.params.email;
-      const query = { email: email };
-      const month = req.query.month;
-
-      const update = {
-        $set: {
-          month: month,
-        },
-      };
-      const result = await memberAgreementCollection.updateOne(query, update);
+    app.post("/couponCodes",verifyToken,verifyAdmin, async (req, res) => {
+      const coupon = req.body;
+      const result = await couponCollection.insertOne(coupon);
       res.send(result);
     });
 
-    // payment intent
-    app.post("/create-checkout-session",verifyToken,verifyMember, async (req, res) => {
-      const { price } = req.body;
-      const amount = parseInt(price * 100);
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ["card"],
-      });
-      res.send({ clientSecret: paymentIntent.client_secret });
-    });
-
-    // payments
-    app.post("/payments",verifyToken,verifyMember, async (req, res) => {
-      const payment = req.body;
-      const acceptRequestId = req.query.acceptRequestId;
-      const query = {_id: new ObjectId(acceptRequestId)}
-      const email = req.query.email;
-      const cursor = {email: email}
-      const isExist = await paymentCollection.findOne(cursor)
-      if(isExist){
-        return res.send({message: 'Payment Already Exists'})
-      }
-      const paymentResult = await paymentCollection.insertOne(payment);
-      const deleteResult = await memberAgreementCollection.deleteOne(query)
-      res.send({ paymentResult,deleteResult });
-    });
-
-    app.get("/paymentHistory/:email",verifyToken,verifyMember,async(req,res) => {
-      const email = req.params.email;
-      const query = {email: email}
-      const result = await paymentCollection.findOne(query)
+    app.delete("/couponCodes/:id",verifyToken,verifyAdmin,async(req,res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await couponCollection.deleteOne(query)
       res.send(result)
     })
+
+    // make payment apis
+    app.get(
+      "/acceptRequests/:email",
+      verifyToken,
+      verifyMember,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await memberAgreementCollection.findOne(query);
+        res.send(result);
+      }
+    );
+
+    app.patch(
+      "/acceptRequest/:email",
+      verifyToken,
+      verifyMember,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const month = req.query.month;
+
+        const update = {
+          $set: {
+            month: month,
+          },
+        };
+        const result = await memberAgreementCollection.updateOne(query, update);
+        res.send(result);
+      }
+    );
+
+    // payment intent
+    app.post(
+      "/create-checkout-session",
+      verifyToken,
+      verifyMember,
+      async (req, res) => {
+        const { price } = req.body;
+        const amount = parseInt(price * 100);
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+        res.send({ clientSecret: paymentIntent.client_secret });
+      }
+    );
+
+    // payments
+    app.post("/payments", verifyToken, verifyMember, async (req, res) => {
+      const payment = req.body;
+      const acceptRequestId = req.query.acceptRequestId;
+      const query = { _id: new ObjectId(acceptRequestId) };
+      const email = req.query.email;
+      const cursor = { email: email };
+      const isExist = await paymentCollection.findOne(cursor);
+      if (isExist) {
+        return res.send({ message: "Payment Already Exists" });
+      }
+      const paymentResult = await paymentCollection.insertOne(payment);
+      const deleteResult = await memberAgreementCollection.deleteOne(query);
+      res.send({ paymentResult, deleteResult });
+    });
+
+    app.get(
+      "/paymentHistory/:email",
+      verifyToken,
+      verifyMember,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const result = await paymentCollection.findOne(query);
+        res.send(result);
+      }
+    );
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
