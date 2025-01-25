@@ -119,6 +119,13 @@ async function run() {
       // console.log(total);
     });
 
+    app.get('/lowPriceApartments',async(req,res) => {
+      const sort = {rent: 1}
+      const result = await ApartmentsCollection.find().sort(sort).limit(8).toArray()
+      res.send(result)
+      
+    })
+
     app.get("/search", async (req, res) => {
       const search = parseInt(req.query.search);
       let cursor = {
@@ -246,7 +253,7 @@ async function run() {
     });
 
     // coupon code related apis
-    app.get("/couponCodes",verifyToken, async (req, res) => {
+    app.get("/couponCodes", async (req, res) => {
       const result = await couponCollection.find().toArray();
       res.send(result);
     });
