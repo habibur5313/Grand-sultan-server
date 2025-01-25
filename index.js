@@ -340,6 +340,36 @@ async function run() {
         res.send(result);
       }
     );
+
+    // coupon apis
+    app.get('/couponCheck/:code',async(req,res) => {
+      const code = req.params.code;
+      const query = {couponCode: code}
+      const email = req.query.email;
+      const queryEmail = {email: email}
+      const findAcceptRequest = await memberAgreementCollection.findOne(queryEmail)
+      const findCoupon = await couponCollection.findOne(query)
+      // console.log(findCoupon.discountPercentage,findAcceptRequest.rent);
+      if(findCoupon){
+        const discount = findAcceptRequest.rent / findCoupon.discountPercentage
+        const totalPrice = findAcceptRequest.rent - discount
+        const update = {
+          $set: {
+            rent: totalPrice
+          }
+        }
+        const updatePrice = await memberAgreementCollection.updateOne(queryEmail,update)
+        res.send(updatePrice)
+        
+      }
+else{
+   res.send({
+    message: "One user one agreement",
+    insertedId: null,
+  });
+  
+}
+    })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
