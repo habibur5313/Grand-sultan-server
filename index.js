@@ -34,6 +34,7 @@ async function run() {
     const announcementCollection = document.collection("announcements");
     const paymentCollection = document.collection("payments");
     const couponCollection = document.collection("coupons");
+    const reviewsCollection = document.collection("reviews");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -157,6 +158,12 @@ async function run() {
         const result = await ApartmentsCollection.find().toArray();
       res.send(result);
       }
+    })
+
+    // reviews related api
+    app.get('/reviews',async(req,res) => {
+      const result = await reviewsCollection.find().toArray()
+      res.send(result)
     })
 
     // agreements related apis
