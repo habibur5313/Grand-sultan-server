@@ -137,6 +137,28 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/apartments/:sort",async(req,res) => {
+      const sort = req.params.sort;
+      if(sort === 'sort by rent (Descending)'){
+        const sortItem = { rent: -1 };
+        const result = await ApartmentsCollection.find()
+          .sort(sortItem)
+          .toArray();
+        res.send(result);
+      }
+      else if(sort === 'sort by rent (Ascending)'){
+        const sortItem = { rent: 1 };
+        const result = await ApartmentsCollection.find()
+          .sort(sortItem)
+          .toArray();
+        res.send(result);
+      }
+      else{
+        const result = await ApartmentsCollection.find().toArray();
+      res.send(result);
+      }
+    })
+
     // agreements related apis
     app.get("/agreements", verifyToken, verifyAdmin, async (req, res) => {
       const result = await agreementCollection.find().toArray();
